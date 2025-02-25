@@ -24,14 +24,15 @@ def localpath(*args):
     return op.abspath(op.join(op.dirname(__file__), *args))
 
 
-MODULES = ['defs', '_errors', '_objects', '_proxy', '_proxy_numpy2',
-           'h5fd', 'h5z', 'h5', 'h5i', 'h5r', 'utils', '_selector',
+MODULES_NUMPY2 = ['_npystrings']
+MODULES = ['defs', '_errors', '_objects', '_proxy', 'h5fd', 'h5z',
+            'h5', 'h5i', 'h5r', 'utils', '_selector',
             '_conv', 'h5t', 'h5s',
             'h5p',
             'h5d', 'h5a', 'h5f', 'h5g',
             'h5l', 'h5o',
             'h5ds', 'h5ac',
-            'h5pl']
+            'h5pl'] + MODULES_NUMPY2
 
 COMPILER_SETTINGS = {
    'libraries'      : ['hdf5', 'hdf5_hl'],
@@ -127,7 +128,7 @@ class h5py_build_ext(build_ext):
         settings['libraries'] += EXTRA_LIBRARIES.get(module, [])
 
         assert numpy.__version__ >= '2.0'  # See build dependencies in pyproject.toml
-        if 'numpy2' in module:
+        if module in MODULES_NUMPY2:
             # Enable NumPy 2.0 C API for modules that require it.
             # These modules will not be importable when NumPy 1.x is installed.
             settings['define_macros'].append(('NPY_TARGET_VERSION', 0x00000012))

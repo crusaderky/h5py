@@ -1,9 +1,8 @@
-"""Additions to proxy.pyx which require numpy >=2.0 to be imported.
+"""Support for NpyStrings - NumPy's native variable-width strings.
 
-In order to allow the rest of h5py to be imported on numpy 1.x, this file
-- must be conditionally imported
-- can't be cimported
-- can't have a .pxd header
+This module requires NumPy >=2.0 to be imported. To allow the rest of h5py
+to work with NumPy 1.x installed, this module must be imported conditionally
+and can't be cimport'ed.
 """
 include "config.pxi"
 
@@ -114,7 +113,7 @@ cdef void _vstrings_scatter(hid_t space, void* contig, void* noncontig,
     if info.allocator is NULL:
         raise RuntimeError("Failed to acquire string allocator")
 
-    # Disregard mtype from the caller.
+    # Disregard mtype from _proxy::dset_rw.
     # The memory type is actually npy_packed_static_string
     # (an opaque struct *typically* 16 bytes per point),
     # and not HDF5 variable length strings (char*; 8 bytes per point).
@@ -145,7 +144,7 @@ def vstrings_gather(hid_t space, size_t contig, size_t noncontig, size_t descr,
     continue working everywhere else.
     """
     _vstrings_gather(space, <void *>contig, <void *>noncontig,
-                        <PyArray_Descr *>descr, npoints)
+                     <PyArray_Descr *>descr, npoints)
 
 
 cdef void _vstrings_gather(hid_t space, void* contig, void* noncontig,

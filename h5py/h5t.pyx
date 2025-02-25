@@ -44,11 +44,7 @@ _IS_PPC64LE = _UNAME_MACHINE == "ppc64le"
 
 cdef char* H5PY_PYTHON_OPAQUE_TAG = "PYTHON:OBJECT"
 
-def _parse_version(version):
-    return tuple(map(int, version.split('.')[:2]))
-
-# NpyStrings (variable-width Unicode strings)
-USE_NPY_STRINGS = _parse_version(np.__version__) >= (2, 0)
+NUMPY_GE2 = int(np.__version__.split('.')[0]) >= 2
 
 # === Custom C API ============================================================
 
@@ -1741,7 +1737,7 @@ cpdef TypeID py_create(object dtype_in, bint logical=0, bint aligned=0):
             return _c_bool(dt)
 
         # numpy.dtypes.StringDType
-        elif kind == c'T' and USE_NPY_STRINGS:
+        elif kind == c'T':
             return _c_vlen_unicode()
 
         # Object types (including those with vlen hints)
@@ -1787,7 +1783,8 @@ def string_dtype(encoding='utf-8', length=None):
     For variable length strings, the data should be passed as Python str objects
     if the encoding is 'utf-8', and bytes if it is 'ascii'.
     Starting from NumPy 2.0, it is preferred to pass utf-8 data as variable-width
-    numpy strings (``numpy.dtypes.StringDType``)
+    numpy strings (``dtype=numpy.dtypes.StringDType`` or ``dtype=numpy.dtype("T")``
+    instead of ``dtype=h5py.string_dtype()``).
 
     For fixed length strings, the data should be numpy fixed length *bytes*
     arrays, regardless of the encoding. Fixed length unicode data is not
@@ -1807,9 +1804,7 @@ def string_dtype(encoding='utf-8', length=None):
         # Fixed length string
         return np.dtype("|S" + str(length), metadata={'h5py_encoding': encoding})
     elif length is None:
-        # Variable-width string
-        if encoding == 'utf-8' and USE_NPY_STRINGS:
-            return np.dtype('T')
+        # Variable-width Python object string
         vlen = str if (encoding == 'utf-8') else bytes
         return np.dtype('O', metadata={'vlen': vlen})
     else:
@@ -1879,8 +1874,6 @@ def special_dtype(**kwds):
     name, val = kwds.popitem()
 
     if name == 'vlen':
-        if val is str and USE_NPY_STRINGS:
-            return np.dtype('T')
         return np.dtype('O', metadata={'vlen': val})
 
     if name == 'enum':
@@ -1904,7 +1897,7 @@ def check_vlen_dtype(dt):
     Returns None if the dtype does not represent an HDF5 vlen.
     """
     # StringDType (numpy >=2.0)
-    if dt.kind == 'T' and USE_NPY_STRINGS:
+    if dt.kind == 'T':
         return str
 
     try:
@@ -1994,7 +1987,7 @@ def check_dtype(**kwds):
         raise TypeError('Unknown special type "%s"' % name)
 
     # StringDType (numpy >=2.0)
-    if name == "vlen" and dt.kind == "T" and USE_NPY_STRINGS:
+    if name == "vlen" and dt.kind == "T":
         return str
 
     try:

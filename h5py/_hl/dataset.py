@@ -173,6 +173,9 @@ def make_new_dset(parent, shape=None, dtype=None, data=None, name=None,
         sid = h5s.create_simple(shape, maxshape)
 
     dset_id = h5d.create(parent.id, name, tid, sid, dcpl=dcpl, dapl=dapl)
+    # Multiple NumPy dtypes can map to the same hdf5 type; e.g.
+    # object strings or NpyStrings map to vlen strings.
+    dset_id._dtype = dtype
 
     if (data is not None) and (not isinstance(data, Empty)):
         dset_id.write(h5s.ALL, h5s.ALL, data)
@@ -254,7 +257,7 @@ class AsTypeView(AbstractView):
     """
     def __init__(self, dset, dtype):
         super().__init__(dset)
-        self._dtype = numpy.dtype(dtype)
+        self._dtype = dtype
 
     @property
     def dtype(self):
@@ -437,10 +440,31 @@ class Dataset(HLObject):
 
         >>> double_precision = dataset.astype('f8')[0:100:2]
         """
+        dtype = numpy.dtype(dtype)
+        if dtype == self.dtype:
+            return self
+
+        if dtype.kind == "T":
+            string_info = h5t.check_string_dtype(self.dtype)
+            if string_info is None:
+                raise TypeError(
+                    f"dset.astype({dtype}) can only be used on datasets with "
+                    "an HDF5 string datatype"
+                )
+            out = self.parent[self.name]
+            assert out.id is not self.id
+            out.id._dtype = dtype
+            return out
+        elif dtype == object and self.dtype.kind == "T":
+            out = self.parent[self.name]
+            assert out.id is not self.id
+            out.id._dtype = None
+            return out
+
         return AsTypeView(self, dtype)
 
     def asstr(self, encoding=None, errors='strict'):
-        """Get a wrapper to read string data as variable-length strings:
+        """Get a wrapper to read string data as Python strings:
 
         >>> str_array = dataset.asstr()[:]
 
@@ -449,12 +473,13 @@ class Dataset(HLObject):
         datatype (either ascii or utf-8).
 
         .. note::
+           On NumPy 2.0 and later, it is recommended to use native NumPy
+           variable-width strings instead:
 
-            This method is a no-op for UTF-8 strings on NumPy >= 2.0.
+           >>> str_array = dataset.astype('T')[:]
         """
-        # Variable-width strings (numpy >=2.0)
-        if self.dtype.kind == 'T':
-            return self
+        if self.dtype.kind == "T":
+            return self.astype(object).asstr(encoding, errors)
 
         string_info = h5t.check_string_dtype(self.dtype)
         if string_info is None:

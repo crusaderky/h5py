@@ -15,10 +15,11 @@
 
 include "config.pxi"
 
-from .h5t import USE_NPY_STRINGS
-if USE_NPY_STRINGS:
-    # This fails to import on numpy < 2.0
-    from ._proxy_numpy2 import vstrings_scatter, vstrings_gather
+from .h5t import NUMPY_GE2
+if NUMPY_GE2:
+    # Numpy native variable-width strings
+    # This fails to import on NumPy < 2.0
+    from ._npystrings import vstrings_scatter, vstrings_gather
 
 cdef enum copy_dir:
     H5PY_SCATTER = 0,
@@ -149,20 +150,17 @@ cdef herr_t dset_rw(hid_t dset, hid_t mtype, hid_t mspace, hid_t fspace,
             if H5Tis_variable_str(mtype):
                 # numpy.dtypes.StringDType
                 assert H5Tis_variable_str(dstype)
-                # ABI needs numpy >=2.0; Cython API needs numpy >=2.3
-                if USE_NPY_STRINGS:
-                    if read:
-                        H5Dread(dset, dstype, cspace, fspace, dxpl, conv_buf)
-                        vstrings_scatter(mspace, <size_t>conv_buf, <size_t>progbuf,
-                                         <size_t>descr)
-                        H5Dvlen_reclaim(dstype, cspace, H5P_DEFAULT, conv_buf)
-                    else:
-                        vstrings_gather(mspace, <size_t>conv_buf, <size_t>progbuf,
-                                        <size_t>descr, npoints)
-                        H5Dwrite(dset, dstype, cspace, fspace, dxpl, conv_buf)
-                        free((<char**>conv_buf)[0])
+                assert NUMPY_GE2
+                if read:
+                    H5Dread(dset, dstype, cspace, fspace, dxpl, conv_buf)
+                    vstrings_scatter(mspace, <size_t>conv_buf, <size_t>progbuf,
+                                        <size_t>descr)
+                    H5Dvlen_reclaim(dstype, cspace, H5P_DEFAULT, conv_buf)
                 else:
-                    raise AssertionError("All strings should have object dtype")
+                    vstrings_gather(mspace, <size_t>conv_buf, <size_t>progbuf,
+                                    <size_t>descr, npoints)
+                    H5Dwrite(dset, dstype, cspace, fspace, dxpl, conv_buf)
+                    free((<char**>conv_buf)[0])
 
             elif read:
                 H5Dread(dset, dstype, cspace, fspace, dxpl, conv_buf)

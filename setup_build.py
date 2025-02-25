@@ -10,6 +10,7 @@ try:
 except ImportError:
     from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
+import copy
 import sys
 import os
 import os.path as op
@@ -23,8 +24,8 @@ def localpath(*args):
     return op.abspath(op.join(op.dirname(__file__), *args))
 
 
-MODULES = ['defs', '_errors', '_objects', '_proxy', 'h5fd', 'h5z',
-            'h5', 'h5i', 'h5r', 'utils', '_selector',
+MODULES = ['defs', '_errors', '_objects', '_proxy', '_proxy_numpy2',
+           'h5fd', 'h5z', 'h5', 'h5i', 'h5r', 'utils', '_selector',
             '_conv', 'h5t', 'h5s',
             'h5p',
             'h5d', 'h5a', 'h5f', 'h5g',
@@ -78,8 +79,8 @@ class h5py_build_ext(build_ext):
         NumPy being present in the main body of the setup script.
     """
 
-    @staticmethod
-    def _make_extensions(config):
+    @classmethod
+    def _make_extensions(cls, config):
         """ Produce a list of Extension instances which can be passed to
         cythonize().
 
@@ -115,12 +116,23 @@ class h5py_build_ext(build_ext):
         if os.name != 'nt':
             settings['runtime_library_dirs'] = settings['library_dirs']
 
-        def make_extension(module):
-            sources = [localpath('h5py', module + '.pyx')] + EXTRA_SRC.get(module, [])
-            settings['libraries'] += EXTRA_LIBRARIES.get(module, [])
-            return Extension('h5py.' + module, sources, **settings)
+        return [cls._make_extension(m, settings) for m in MODULES]
 
-        return [make_extension(m) for m in MODULES]
+    @staticmethod
+    def _make_extension(module, settings):
+        import numpy
+
+        sources = [localpath('h5py', module + '.pyx')] + EXTRA_SRC.get(module, [])
+        settings = copy.deepcopy(settings)
+        settings['libraries'] += EXTRA_LIBRARIES.get(module, [])
+
+        assert numpy.__version__ >= '2.0'  # See build dependencies in pyproject.toml
+        if 'numpy2' in module:
+            # Enable NumPy 2.0 C API for modules that require it.
+            # These modules will not be importable when NumPy 1.x is installed.
+            settings['define_macros'].append(('NPY_TARGET_VERSION', 0x00000012))
+
+        return Extension('h5py.' + module, sources, **settings)
 
     def run(self):
         """ Distutils calls this method to run the command """

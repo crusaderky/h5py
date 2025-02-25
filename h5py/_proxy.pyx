@@ -15,6 +15,11 @@
 
 include "config.pxi"
 
+from .h5t import USE_NPY_STRINGS
+if USE_NPY_STRINGS:
+    # This fails to import on numpy < 2.0
+    from ._proxy_numpy2 import vstrings_scatter, vstrings_gather
+
 cdef enum copy_dir:
     H5PY_SCATTER = 0,
     H5PY_GATHER
@@ -83,7 +88,8 @@ cdef herr_t attr_rw(hid_t attr, hid_t mtype, void *progbuf, int read) except -1:
 
 
 cdef herr_t dset_rw(hid_t dset, hid_t mtype, hid_t mspace, hid_t fspace,
-                    hid_t dxpl, void* progbuf, int read) except -1:
+                    hid_t dxpl, void* progbuf, PyArray_Descr* descr,
+                    int read) except -1:
 
     cdef htri_t need_bkg
     cdef hid_t dstype = -1      # Dataset datatype
@@ -123,6 +129,8 @@ cdef herr_t dset_rw(hid_t dset, hid_t mtype, hid_t mspace, hid_t fspace,
                 fspace = mspace = dspace = H5Dget_space(dset)
 
             npoints = H5Sget_select_npoints(mspace)
+            if npoints == 0:
+                return 0
             cspace = H5Screate_simple(1, &npoints, NULL)
 
             conv_buf = create_buffer(H5Tget_size(dstype), H5Tget_size(mtype), npoints)
@@ -138,7 +146,25 @@ cdef herr_t dset_rw(hid_t dset, hid_t mtype, hid_t mspace, hid_t fspace,
                 if read:
                     h5py_copy(mtype, mspace, back_buf, progbuf, H5PY_GATHER)
 
-            if read:
+            if H5Tis_variable_str(mtype):
+                # numpy.dtypes.StringDType
+                assert H5Tis_variable_str(dstype)
+                # ABI needs numpy >=2.0; Cython API needs numpy >=2.3
+                if USE_NPY_STRINGS:
+                    if read:
+                        H5Dread(dset, dstype, cspace, fspace, dxpl, conv_buf)
+                        vstrings_scatter(mspace, <size_t>conv_buf, <size_t>progbuf,
+                                         <size_t>descr)
+                        H5Dvlen_reclaim(dstype, cspace, H5P_DEFAULT, conv_buf)
+                    else:
+                        vstrings_gather(mspace, <size_t>conv_buf, <size_t>progbuf,
+                                        <size_t>descr, npoints)
+                        H5Dwrite(dset, dstype, cspace, fspace, dxpl, conv_buf)
+                        free((<char**>conv_buf)[0])
+                else:
+                    raise AssertionError("All strings should have object dtype")
+
+            elif read:
                 H5Dread(dset, dstype, cspace, fspace, dxpl, conv_buf)
                 H5Tconvert(dstype, mtype, npoints, conv_buf, back_buf, dxpl)
                 h5py_copy(mtype, mspace, conv_buf, progbuf, H5PY_SCATTER)
@@ -264,8 +290,8 @@ cdef herr_t h5py_gather_cb(void* elem, hid_t type_id, unsigned ndim,
 
 # Copy between a contiguous and non-contiguous buffer, with the layout
 # of the latter specified by a dataspace selection.
-cdef herr_t h5py_copy(hid_t tid, hid_t space, void* contig, void* noncontig,
-                 copy_dir op) except -1:
+cdef void h5py_copy(hid_t tid, hid_t space, void* contig, void* noncontig,
+                    copy_dir op):
 
     cdef h5py_scatter_t info
     cdef hsize_t elsize
@@ -281,9 +307,7 @@ cdef herr_t h5py_copy(hid_t tid, hid_t space, void* contig, void* noncontig,
     elif op == H5PY_GATHER:
         H5Diterate(noncontig, tid, space, h5py_gather_cb, &info)
     else:
-        raise RuntimeError("Illegal direction")
-
-    return 0
+        raise AssertionError("unreachable")
 
 # =============================================================================
 # VLEN support routines

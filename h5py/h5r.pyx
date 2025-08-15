@@ -1,4 +1,3 @@
-# cython: language_level=3
 # This file is part of h5py, a Python interface to the HDF5 library.
 #
 # http://www.h5py.org
@@ -171,7 +170,7 @@ cdef class Reference:
         self.typecode = H5R_OBJECT
         self.typesize = sizeof(hobj_ref_t)
 
-    def __nonzero__(self):
+    def __bool__(self):
         cdef int i
         for i in range(self.typesize):
             if (<unsigned char*>&self.ref)[i] != 0: return True

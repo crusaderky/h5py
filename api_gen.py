@@ -76,7 +76,7 @@ class Line:
         .args:      "a, b"
     """
 
-    PATTERN = re.compile("""(?P<mpi>(MPI)[ ]+)?
+    PATTERN = re.compile(r"""(?P<mpi>(MPI)[ ]+)?
                             (?P<ros3>(ROS3)[ ]+)?
                             (?P<direct_vfd>(DIRECT_VFD)[ ]+)?
                             (?P<min_version>([0-9]+\.[0-9]+\.[0-9]+))?
@@ -89,7 +89,7 @@ class Line:
                             (?P<nogil>(nogil))?
                             """, re.VERBOSE)
 
-    SIG_PATTERN = re.compile("""
+    SIG_PATTERN = re.compile(r"""
                              (?:unsigned[ ]+)?
                              (?:[a-zA-Z_]+[a-zA-Z0-9_]*\**)
                              [ ]+[ *]*
@@ -143,7 +143,6 @@ class Line:
 
 
 raw_preamble = """\
-# cython: language_level=3
 #
 # Warning: this file is auto-generated from api_gen.py. DO NOT EDIT!
 #
@@ -155,7 +154,6 @@ from .api_types_ext cimport *
 """
 
 def_preamble = """\
-# cython: language_level=3
 #
 # Warning: this file is auto-generated from api_gen.py. DO NOT EDIT!
 #
@@ -168,7 +166,6 @@ from .api_types_ext cimport *
 """
 
 imp_preamble = """\
-# cython: language_level=3
 #
 # Warning: this file is auto-generated from api_gen.py. DO NOT EDIT!
 #

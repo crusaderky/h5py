@@ -127,7 +127,7 @@ class h5py_build_ext(build_ext):
         settings = copy.deepcopy(settings)
         settings['libraries'] += EXTRA_LIBRARIES.get(module, [])
 
-        assert numpy.__version__ >= '2.0'  # See build dependencies in pyproject.toml
+        assert int(numpy.__version__.split('.')[0]) >= 2  # See build dependencies in pyproject.toml
         if module in MODULES_NUMPY2:
             # Enable NumPy 2.0 C API for modules that require it.
             # These modules will not be importable when NumPy 1.x is installed.
@@ -155,9 +155,9 @@ class h5py_build_ext(build_ext):
         config = BuildConfig.from_env()
         config.summarise()
 
-        if config.hdf5_version < (1, 10, 6):
+        if config.hdf5_version < (1, 10, 7) or config.hdf5_version == (1, 12, 0):
             raise Exception(
-                f"This version of h5py requires HDF5 >= 1.10.6 (got version "
+                f"This version of h5py requires HDF5 >= 1.10.7 and != 1.12.0 (got version "
                 f"{config.hdf5_version} from environment variable or library)"
             )
 

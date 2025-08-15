@@ -15,13 +15,11 @@
     are tested by module test_attrs_data.
 """
 
-from uuid import uuid4
-
 import numpy as np
 
 from collections.abc import MutableMapping
 
-from .common import TestCase, ut
+from .common import TestCase, name
 
 import h5py
 from h5py import File
@@ -45,7 +43,7 @@ class TestRepr(TestCase):
     """
 
     def test_repr(self):
-        grp = self.f.create_group('grp')
+        grp = self.f.create_group(name())
         grp.attrs.create('att', 1)
         self.assertIsInstance(repr(grp.attrs), str)
         grp.id.close()
@@ -187,12 +185,12 @@ class TestCreate(BaseAttrs):
     def test_named(self):
         """ Attributes created from named types link to the source type object
         """
-        self.f[(uid:=str(uuid4()))] = np.dtype('u8')
-        self.f.attrs.create('x', 42, dtype=self.f[uid])
+        self.f[name()] = np.dtype('u8')
+        self.f.attrs.create('x', 42, dtype=self.f[name()])
         self.assertEqual(self.f.attrs['x'], 42)
         aid = h5a.open(self.f.id, b'x')
         htype = aid.get_type()
-        htype2 = self.f[uid].id
+        htype2 = self.f[name()].id
         self.assertEqual(htype, htype2)
         self.assertTrue(htype.committed())
 
@@ -242,7 +240,7 @@ class TestVlen(BaseAttrs):
 
 class TestTrackOrder(BaseAttrs):
     def fill_attrs(self, track_order):
-        attrs = self.f.create_group(str(uuid4()), track_order=track_order).attrs
+        attrs = self.f.create_group(name(), track_order=track_order).attrs
         for i in range(100):
             attrs[str(i)] = i
         return attrs
@@ -259,7 +257,7 @@ class TestTrackOrder(BaseAttrs):
                          sorted([str(i) for i in range(100)]))
 
     def fill_attrs2(self, track_order):
-        group = self.f.create_group(str(uuid4()), track_order=track_order)
+        group = self.f.create_group(name(), track_order=track_order)
         for i in range(12):
             group.attrs[str(i)] = i
         return group
@@ -280,8 +278,8 @@ class TestTrackOrder(BaseAttrs):
 class TestDatatype(BaseAttrs):
 
     def test_datatype(self):
-        self.f[(uid:=str(uuid4()))] = np.dtype('f')
-        dt = self.f[uid]
+        self.f[name()] = np.dtype('f')
+        dt = self.f[name()]
         self.assertEqual(list(dt.attrs.keys()), [])
         dt.attrs.create('a', 4.0)
         self.assertEqual(list(dt.attrs.keys()), ['a'])

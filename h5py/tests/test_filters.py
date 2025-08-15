@@ -15,7 +15,7 @@ import os
 import numpy as np
 import h5py
 
-from .common import ut, TestCase
+from .common import ut, TestCase, name
 
 
 class TestFilters(TestCase):
@@ -37,7 +37,7 @@ class TestFilters(TestCase):
         - https://lists.hdfgroup.org/pipermail/
           hdf-forum_lists.hdfgroup.org/2018-January/010753.html
         """
-        self.f.create_dataset("test_data",
+        self.f.create_dataset(name(),
                               data=np.zeros(10000, dtype=np.float64),
                               fletcher32=True,
                               compression="szip",
@@ -54,7 +54,7 @@ class TestFilters(TestCase):
         """
         data = np.linspace(0, 1, 100)
         with self.assertRaises(ValueError):
-            self.f.create_dataset("test_data",
+            self.f.create_dataset(name(),
                                   data=data,
                                   fletcher32=True,
                                   # retain 3 digits after the decimal point

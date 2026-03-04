@@ -14,6 +14,8 @@
 
     1. Slicing operations for read and write, handled by module test_slicing
     2. Type conversion for read and write (currently untested)
+    3. Multi-threaded concurrent access to the same Dataset, handled by module
+       test_dataset_concurrent
 """
 
 import pathlib
